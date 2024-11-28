@@ -17,6 +17,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkRequest
 import java.util.concurrent.TimeUnit
 import android.Manifest
+import android.widget.Toast
 
 class MainActivity : AppCompatActivity() {
 
@@ -35,41 +36,46 @@ class MainActivity : AppCompatActivity() {
                     this,
                     arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1
                 )
+            } else {
+                // Permission granted, schedule the work
+                scheduleWork()
             }
+        } else {
+            // For Android versions below 13, no permission request needed
+            scheduleWork()
         }
+    }
 
-        // Create the NotificationChannel only once (avoid creating every time activity is created)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val notificationManager = getSystemService(NotificationManager::class.java)
-            val channelId = "default"
-            if (notificationManager.getNotificationChannel(channelId) == null) {
-                val channel = NotificationChannel(
-                    channelId,
-                    "Default",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                )
-                channel.description = "Channel for default notifications"
-                notificationManager.createNotificationChannel(channel)
-            }
-        }
-
-        // Build the WorkRequest for NotificationWorker
+    // This method schedules the work once permission is granted
+    private fun scheduleWork() {
+        // Build the WorkRequest for NotificationWorker (with a 5-minute delay)
         val notificationWorkRequest: WorkRequest =
             OneTimeWorkRequest.Builder(NotificationWorker::class.java)
-                .setInitialDelay(1, TimeUnit.MINUTES)
+                .setInitialDelay(1, TimeUnit.MINUTES)  // Delay time in minutes
                 .build()
 
         // Log the work request details for debugging
         Log.i("WorkManager", "WorkRequest created: $notificationWorkRequest")
 
-        // Enqueue the WorkRequest with WorkManager
+        // Enqueue the work request
         WorkManager.getInstance(this).enqueue(notificationWorkRequest)
+    }
 
-        // Handle window insets (edge-to-edge)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
-            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
-            insets
+    // Handle the permission request result
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 1) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                // Permission granted, schedule the work
+                scheduleWork()
+            } else {
+                // Permission denied, show a message or handle accordingly
+                Toast.makeText(this, "Permission denied. Task won't be scheduled.", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 }
+
+
